@@ -1,15 +1,13 @@
 package com.alibaba.otter.canal.connector.kafka.producer;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import com.alibaba.otter.canal.common.utils.PropertiesUtils;
+import com.alibaba.otter.canal.protocol.CanalEntry;
 import org.apache.commons.lang.StringUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -205,32 +203,74 @@ public class CanalKafkaProducer extends AbstractMQProducer implements CanalMQPro
             partitionNum = mqDestination.getPartitionsNum();
         }
         if (!flat) {
-            if (mqDestination.getPartitionHash() != null && !mqDestination.getPartitionHash().isEmpty()) {
-                // 并发构造
-                EntryRowData[] datas = MQMessageUtils.buildMessageData(message, buildExecutor);
-                // 串行分区
-                Message[] messages = MQMessageUtils.messagePartition(datas,
-                    message.getId(),
-                    partitionNum,
-                    mqDestination.getPartitionHash(),
-                    this.mqProperties.isDatabaseHash());
-                int length = messages.length;
-                for (int i = 0; i < length; i++) {
-                    Message messagePartition = messages[i];
-                    if (messagePartition != null) {
-                        records.add(new ProducerRecord<>(topicName,
-                            i,
-                            null,
-                            CanalMessageSerializerUtil.serializer(messagePartition,
-                                mqProperties.isFilterTransactionEntry())));
+            // 并发构造
+            EntryRowData[] datas = MQMessageUtils.buildMessageData(message, buildExecutor);
+
+            // 按database + '.' + table 分段分区
+            int from = 0;
+            while (from < datas.length) {
+                String database = datas[from].entry.getHeader().getSchemaName();
+                String table = datas[from].entry.getHeader().getTableName();
+                int to = from + 1;
+
+                while(to < datas.length) {
+                    String database_to = datas[to].entry.getHeader().getSchemaName();
+                    String table_to = datas[to].entry.getHeader().getTableName();
+
+                    if(database.equals(database_to) && table.equals(table_to)) {
+                        to ++;
+                    } else {
+                        break;
                     }
                 }
-            } else {
-                final int partition = mqDestination.getPartition() != null ? mqDestination.getPartition() : 0;
-                records.add(new ProducerRecord<>(topicName,
-                    partition,
-                    null,
-                    CanalMessageSerializerUtil.serializer(message, mqProperties.isFilterTransactionEntry())));
+
+                String key = database + '.' + table;
+                MQMessageUtils.HashMode hashMode = MQMessageUtils.getPartitionHashColumns(key, mqDestination.getPartitionHash());
+
+                if (mqDestination.getPartitionHash() != null
+                        && !mqDestination.getPartitionHash().isEmpty()
+                        && hashMode != null) {
+
+                    EntryRowData[] datasSlice = Arrays.copyOfRange(datas, from, to);
+
+                    // 串行分区
+                    Message[] messages = MQMessageUtils.messagePartition(datasSlice,
+                            message.getId(),
+                            partitionNum,
+                            mqDestination.getPartitionHash(),
+                            this.mqProperties.isDatabaseHash());
+                    int length = messages.length;
+                    for (int i = 0; i < length; i++) {
+                        Message messagePartition = messages[i];
+                        if (messagePartition != null) {
+                            records.add(new ProducerRecord<>(topicName,
+                                    i, key,
+                                    CanalMessageSerializerUtil.serializer(messagePartition,
+                                            mqProperties.isFilterTransactionEntry())));
+                        }
+                    }
+                } else {
+                    List<CanalEntry.Entry> entries = new ArrayList<>();
+                    for (int i = from; i < to; i++) {
+                        CanalEntry.Entry entry = datas[i].entry;
+                        if (entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONBEGIN
+                                || entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONEND) {
+                            continue;
+                        }
+                        entries.add(entry);
+                    }
+
+                    if (!entries.isEmpty()) {
+                        Message messageSlice = new Message(message.getId(), entries);
+                        records.add(new ProducerRecord<>(topicName,
+                                mqDestination.getPartition(),
+                                key,
+                                CanalMessageSerializerUtil.serializer(messageSlice, mqProperties.isFilterTransactionEntry())));
+                    }
+                }
+
+                //计算下一段datas
+                from = to;
             }
         } else {
             // 发送扁平数据json
@@ -239,23 +279,32 @@ public class CanalKafkaProducer extends AbstractMQProducer implements CanalMQPro
             // 串行分区
             List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, message.getId());
             for (FlatMessage flatMessage : flatMessages) {
-                if (mqDestination.getPartitionHash() != null && !mqDestination.getPartitionHash().isEmpty()) {
+
+                String database = flatMessage.getDatabase();
+                String table = flatMessage.getTable();
+                String key = database + '.' + table;
+
+                MQMessageUtils.HashMode hashMode = MQMessageUtils.getPartitionHashColumns(key, mqDestination.getPartitionHash());
+                if (mqDestination.getPartitionHash() != null
+                        && !mqDestination.getPartitionHash().isEmpty()
+                        && hashMode != null) {
                     FlatMessage[] partitionFlatMessage = MQMessageUtils.messagePartition(flatMessage,
-                        partitionNum,
-                        mqDestination.getPartitionHash(),
-                        this.mqProperties.isDatabaseHash());
+                            partitionNum,
+                            mqDestination.getPartitionHash(),
+                            this.mqProperties.isDatabaseHash());
+
                     int length = partitionFlatMessage.length;
                     for (int i = 0; i < length; i++) {
                         FlatMessage flatMessagePart = partitionFlatMessage[i];
                         if (flatMessagePart != null) {
-                            records.add(new ProducerRecord<>(topicName, i, null, JSON.toJSONBytes(flatMessagePart,
-                                JSONWriter.Feature.WriteNulls)));
+                            records.add(new ProducerRecord<>(topicName, i, key, JSON.toJSONBytes(flatMessagePart,
+                                    JSONWriter.Feature.WriteNulls)));
                         }
                     }
                 } else {
-                    final int partition = mqDestination.getPartition() != null ? mqDestination.getPartition() : 0;
-                    records.add(new ProducerRecord<>(topicName, partition, null, JSON.toJSONBytes(flatMessage,
-                        JSONWriter.Feature.WriteNulls)));
+                    //final int partition = mqDestination.getPartition() != null ? mqDestination.getPartition() : 0;
+                    records.add(new ProducerRecord<>(topicName, mqDestination.getPartition(), key, JSON.toJSONBytes(flatMessage,
+                            JSONWriter.Feature.WriteNulls)));
                 }
             }
         }
