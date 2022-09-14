@@ -25,4 +25,6 @@ public class CanalConstants {
     public static final String CANAL_ALIYUN_SECRET_KEY        = ROOT + "." + "aliyun.secretKey";
     public static final String CANAL_ALIYUN_UID               = ROOT + "." + "aliyun.uid";
 
+    public static final String CANAL_MQ_FILTER_QUERY_CTS      = ROOT + "." + "mq.filter.query.cts";
+
 }

@@ -149,7 +149,7 @@ public class CanalRabbitMQProducer extends AbstractMQProducer implements CanalMQ
             // 并发构造
             MQMessageUtils.EntryRowData[] datas = MQMessageUtils.buildMessageData(messageSub, buildExecutor);
             // 串行分区
-            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, messageSub.getId());
+            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, messageSub.getId(), false);
             for (FlatMessage flatMessage : flatMessages) {
                 byte[] message = JSON.toJSONBytes(flatMessage, JSONWriter.Feature.WriteNulls);
                 if (logger.isDebugEnabled()) {

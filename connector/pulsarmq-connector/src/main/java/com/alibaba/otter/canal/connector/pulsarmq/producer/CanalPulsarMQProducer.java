@@ -241,7 +241,7 @@ public class CanalPulsarMQProducer extends AbstractMQProducer implements CanalMQ
             }
         } else {
             // 串行分区
-            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, message.getId());
+            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, message.getId(), false);
 
             // 初始化分区合并队列
             if (destination.getPartitionHash() != null && !destination.getPartitionHash().isEmpty()) {
@@ -345,7 +345,7 @@ public class CanalPulsarMQProducer extends AbstractMQProducer implements CanalMQ
 
     /**
      * 创建多分区topic
-     * 
+     *
      * @param topic
      * @param partitionNum
      */
@@ -371,7 +371,7 @@ public class CanalPulsarMQProducer extends AbstractMQProducer implements CanalMQ
 
     /**
      * 获取topic
-     * 
+     *
      * @param topic
      * @return
      */

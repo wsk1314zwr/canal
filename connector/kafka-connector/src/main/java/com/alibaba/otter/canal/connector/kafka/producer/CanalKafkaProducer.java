@@ -277,7 +277,7 @@ public class CanalKafkaProducer extends AbstractMQProducer implements CanalMQPro
             // 并发构造
             EntryRowData[] datas = MQMessageUtils.buildMessageData(message, buildExecutor);
             // 串行分区
-            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, message.getId());
+            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, message.getId(), mqDestination.isFilterQueryCTS());
             for (FlatMessage flatMessage : flatMessages) {
 
                 String database = flatMessage.getDatabase();

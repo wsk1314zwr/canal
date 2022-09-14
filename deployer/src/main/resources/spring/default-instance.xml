@@ -98,7 +98,7 @@
 				<constructor-arg index="1" value="false" />
 			</bean>
 		</property>
-		
+
 		<property name="fieldFilter" value="${canal.instance.filter.field}" />
 		<property name="fieldBlackFilter" value="${canal.instance.filter.black.field}" />
 
@@ -207,5 +207,6 @@
 		<property name="partitionHash" value="${canal.mq.partitionHash}" />
 		<property name="dynamicTopicPartitionNum" value="${canal.mq.dynamicTopicPartitionNum}" />
 		<property name="enableDynamicQueuePartition" value="${canal.mq.enableDynamicQueuePartition}" />
+		<property name="filterQueryCTS" value="${canal.mq.filter.query.cts:true}" />
 	</bean>
 </beans>

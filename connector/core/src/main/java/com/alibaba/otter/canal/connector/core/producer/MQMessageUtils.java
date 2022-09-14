@@ -352,7 +352,7 @@ public class MQMessageUtils {
      * @return FlatMessage列表
      * @author agapple 2018年12月11日 下午1:28:32
      */
-    public static List<FlatMessage> messageConverter(EntryRowData[] datas, long id) {
+    public static List<FlatMessage> messageConverter(EntryRowData[] datas, long id, boolean filterQueryCTS) {
         List<FlatMessage> flatMessages = new ArrayList<>();
         for (EntryRowData entryRowData : datas) {
             CanalEntry.Entry entry = entryRowData.entry;
@@ -360,6 +360,13 @@ public class MQMessageUtils {
             // 如果有分区路由,则忽略begin/end事件
             if (entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONBEGIN
                 || entry.getEntryType() == CanalEntry.EntryType.TRANSACTIONEND) {
+                continue;
+            }
+            //polardb query cts 数据过滤,数据格式:{"data":null,"database":"","es":1663149570000,"id":794,"isDdl":false,"mysqlType":null,
+            // "old":null,"pkNames":null,"sql":"CTS::697575489779059923215068201133392732170000000000122987","sqlType":null,
+            // "table":"","ts":1663149571473,"type":"QUERY"}
+            if (filterQueryCTS && !rowChange.getIsDdl() && CanalEntry.EventType.QUERY == rowChange.getEventType()
+                    && !StringUtils.isBlank(rowChange.getSql()) && rowChange.getSql().startsWith("CTS::")) {
                 continue;
             }
 

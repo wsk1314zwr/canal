@@ -232,7 +232,7 @@ import java.util.stream.Collectors;
             // 并发构造
             MQMessageUtils.EntryRowData[] datas = MQMessageUtils.buildMessageData(message, buildExecutor);
             // 串行分区
-            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, message.getId());
+            List<FlatMessage> flatMessages = MQMessageUtils.messageConverter(datas, message.getId(), false);
             // 初始化分区合并队列
             if (destination.getPartitionHash() != null && !destination.getPartitionHash().isEmpty()) {
                 List<List<FlatMessage>> partitionFlatMessages = new ArrayList<>();

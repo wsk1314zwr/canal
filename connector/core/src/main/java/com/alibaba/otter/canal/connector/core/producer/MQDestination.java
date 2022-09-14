@@ -17,6 +17,16 @@ public class MQDestination {
     private String  dynamicTopicPartitionNum;
     private Boolean enableDynamicQueuePartition;
 
+    public boolean isFilterQueryCTS() {
+        return filterQueryCTS;
+    }
+
+    public void setFilterQueryCTS(boolean filterQueryCTS) {
+        this.filterQueryCTS = filterQueryCTS;
+    }
+
+    private boolean filterQueryCTS  = true;
+
     public String getCanalDestination() {
         return canalDestination;
     }
