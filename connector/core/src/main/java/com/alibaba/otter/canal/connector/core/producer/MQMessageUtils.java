@@ -369,7 +369,11 @@ public class MQMessageUtils {
                     && !StringUtils.isBlank(rowChange.getSql()) && rowChange.getSql().startsWith("CTS::")) {
                 continue;
             }
-
+            if (filterQueryCTS &&  CanalEntry.EventType.QUERY == rowChange.getEventType()
+                    && StringUtils.isBlank(entry.getHeader().getSchemaName())
+                    && StringUtils.isBlank(entry.getHeader().getTableName())) {
+                continue;
+            }
             // build flatMessage
             CanalEntry.EventType eventType = rowChange.getEventType();
             FlatMessage flatMessage = new FlatMessage(id);
